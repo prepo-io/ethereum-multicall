@@ -165,7 +165,7 @@ var Multicall = /** @class */ (function () {
                             contractCallsResults = aggregateResponse.results[response];
                             originalContractCallContext = contractCallContexts[contractCallsResults.contractContextIndex];
                             returnObjectResult = {
-                                originalContractCallContext: utils_2.Utils.deepClone(originalContractCallContext),
+                                originalContractCallContext: originalContractCallContext,
                                 callsReturnContext: [],
                             };
                             for (method = 0; method < contractCallsResults.methodResults.length; method++) {

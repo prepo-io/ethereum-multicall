@@ -159,9 +159,7 @@ export class Multicall {
         contractCallContexts[contractCallsResults.contractContextIndex];
 
       const returnObjectResult: ContractCallReturnContext = {
-        originalContractCallContext: Utils.deepClone(
-          originalContractCallContext
-        ),
+        originalContractCallContext,
         callsReturnContext: [],
       };
 
