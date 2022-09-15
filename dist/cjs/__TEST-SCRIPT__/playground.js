@@ -39,7 +39,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var ethers_1 = require("ethers");
 var __1 = require("../");
 var execute = function () { return __awaiter(void 0, void 0, void 0, function () {
-    var provider, multicall, contractCallContext, context;
+    var provider, multicall, contractCallContext, context, latestBlock, blockNumber, contextOnBlock;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
@@ -90,6 +90,18 @@ var execute = function () { return __awaiter(void 0, void 0, void 0, function ()
                 context = _a.sent();
                 console.log(context.results[contractCallContext.reference].callsReturnContext[0]
                     .returnValues);
+                return [4 /*yield*/, provider.getBlockNumber()];
+            case 2:
+                latestBlock = _a.sent();
+                blockNumber = "".concat(latestBlock - 15);
+                return [4 /*yield*/, multicall.call(contractCallContext, { blockNumber: blockNumber })];
+            case 3:
+                contextOnBlock = _a.sent();
+                console.log({
+                    latestBlock: latestBlock,
+                    blockNumber: blockNumber,
+                    resultBlock: contextOnBlock.blockNumber,
+                });
                 return [2 /*return*/];
         }
     });

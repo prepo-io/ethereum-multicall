@@ -11,22 +11,59 @@ ethereum-multicall is fully written in typescript so has full compile time suppo
 
 ## Supports
 
-- mainnet
-- kovan
-- görli
-- rinkeby
-- ropsten
-- binance smart chain
-- bsc testnet
-- xdai
-- matic
-- mumbai
-- etherlite
-- arbitrum
-- avalaunche fuji testnet
-- avaxlaunche mainnet
-- fantom mainnet
-- custom network with your own instance of multicall deployed
+The below networks are supported by default, and custom networks can be supported by providing your own instance a deployed Multicall contract.
+
+| Chain                   | Chain ID   |
+| ----------------------- | ---------- |
+| Mainnet                 | 1          |
+| Kovan                   | 3          |
+| Rinkeby                 | 4          |
+| Görli                   | 5          |
+| Ropsten                 | 10         |
+| Sepolia                 | 42         |
+| Optimism                | 137        |
+| Optimism Kovan          | 69         |
+| Optimism Görli          | 100        |
+| Arbitrum                | 420        |
+| Arbitrum Görli          | 42161      |
+| Arbitrum Rinkeby        | 421611     |
+| Polygon                 | 421613     |
+| Mumbai                  | 80001      |
+| Gnosis Chain (xDai)     | 11155111   |
+| Avalanche               | 43114      |
+| Avalanche Fuji          | 43113      |
+| Fantom Testnet          | 4002       |
+| Fantom Opera            | 250        |
+| BNB Smart Chain         | 56         |
+| BNB Smart Chain Testnet | 97         |
+| Moonbeam                | 1284       |
+| Moonriver               | 1285       |
+| Moonbase Alpha Testnet  | 1287       |
+| Harmony                 | 1666600000 |
+| Cronos                  | 25         |
+| Fuse                    | 122        |
+| Songbird Canary Network | 19         |
+| Coston Testnet          | 16         |
+| Boba                    | 288        |
+| Aurora                  | 1313161554 |
+| Astar                   | 592        |
+| OKC                     | 66         |
+| Heco Chain              | 128        |
+| Metis                   | 1088       |
+| RSK                     | 30         |
+| RSK Testnet             | 31         |
+| Evmos                   | 9001       |
+| Evmos Testnet           | 9000       |
+| Thundercore             | 108        |
+| Thundercore Testnet     | 18         |
+| Oasis                   | 26863      |
+| Celo                    | 42220      |
+| Godwoken                | 71402      |
+| Godwoken Testnet        | 71401      |
+| Klatyn                  | 8217       |
+| Milkomeda               | 2001       |
+| KCC                     | 321        |
+| Etherlite               | 111        |
 
 ## Installation
 
@@ -43,6 +80,67 @@ $ yarn add ethereum-multicall
 ```
 
 ## Usage
+
+### Overloaded methods
+
+As the [official docs mentions here](https://docs.ethers.io/v3/api-contract.html#prototype):
+
+> Due to signature overloading, multiple functions can have the same name. The first function specifed in the ABI will be bound to its name. To access overloaded functions, use the full typed signature of the functions (e.g. contract["foobar(address,uint256)"]).
+
+So, when creating the contract call context, under the calls array property we should have that in mind and use the method signature rather than the method name. E.g.
+
+```js
+const contractCallContext: ContractCallContext = {
+  reference: 'upV2Controller',
+  contractAddress: '0x19891DdF6F393C02E484D7a942d4BF8C0dB1d001',
+  abi: [
+    {
+      inputs: [],
+      name: 'getVirtualPrice',
+      outputs: [
+        {
+          internalType: 'uint256',
+          name: '',
+          type: 'uint256',
+        },
+      ],
+      stateMutability: 'view',
+      type: 'function',
+    },
+    {
+      inputs: [
+        {
+          internalType: 'uint256',
+          name: 'sentValue',
+          type: 'uint256',
+        },
+      ],
+      name: 'getVirtualPrice',
+      outputs: [
+        {
+          internalType: 'uint256',
+          name: '',
+          type: 'uint256',
+        },
+      ],
+      stateMutability: 'view',
+      type: 'function',
+    },
+  ],
+  calls: [
+    {
+      reference: 'getVirtualPriceWithInput',
+      methodName: 'getVirtualPrice(uint256)',
+      methodParameters: ['0xFFFFFFFFFFFFF'],
+    },
+    {
+      reference: 'getVirtualPriceWithoutInput',
+      methodName: 'getVirtualPrice()',
+      methodParameters: [],
+    },
+  ],
+};
+```
 
 ### Import examples:
 
@@ -85,16 +183,12 @@ let provider = ethers.getDefaultProvider();
 // other context like wallet, signer etc all can be passed in as well.
 const multicall = new Multicall({ ethersProvider: provider, tryAggregate: true });
 
-const contractCallContext: ContractCallContext<{extraContext: string, foo4: boolean}>[] = [
+const contractCallContext: ContractCallContext[] = [
     {
         reference: 'testContract',
         contractAddress: '0x6795b15f3b16Cf8fB3E56499bbC07F6261e9b0C3',
         abi: [ { name: 'foo', type: 'function', inputs: [ { name: 'example', type: 'uint256' } ], outputs: [ { name: 'amounts', type: 'uint256' }] } ],
-        calls: [{ reference: 'fooCall', methodName: 'foo', methodParameters: [42] }],
-        context: {
-          extraContext: 'extraContext',
-          foo4: true
-        }
+        calls: [{ reference: 'fooCall', methodName: 'foo', methodParameters: [42] }]
     },
     {
         reference: 'testContract2',
@@ -219,6 +313,64 @@ console.log(results);
 }
 ```
 
+### specify call block number
+
+The multicall instance call method has an optional second argument of type [ContractCallOptions](src/models/contract-call-options.ts).
+
+One of the options is the blockNumber, so you can choose the height where you want the data from.
+
+It is compatible with both ethers and web3 providers.
+
+```ts
+import {
+  Multicall,
+  ContractCallResults,
+  ContractCallContext,
+} from 'ethereum-multicall';
+import Web3 from 'web3';
+
+const web3 = new Web3('https://some.local-or-remote.node:8546');
+
+const multicall = new Multicall({ web3Instance: web3, tryAggregate: true });
+
+const contractCallContext: ContractCallContext[] = [
+    {
+        reference: 'testContract',
+        contractAddress: '0x6795b15f3b16Cf8fB3E56499bbC07F6261e9b0C3',
+        abi: [ { name: 'foo', type: 'function', inputs: [ { name: 'example', type: 'uint256' } ], outputs: [ { name: 'amounts', type: 'uint256' }] } ],
+        calls: [{ reference: 'fooCall', methodName: 'foo', methodParameters: [42] }]
+    }
+];
+
+const results: ContractCallResults = await multicall.call(contractCallContext,{
+    blockNumber: '14571050'
+});
+console.log(results);
+
+// results: it will have the same block as requested
+{
+  results: {
+      testContract: {
+          originalContractCallContext:  {
+            reference: 'testContract',
+            contractAddress: '0x6795b15f3b16Cf8fB3E56499bbC07F6261e9b0C3',
+            abi: [ { name: 'foo', type: 'function', inputs: [ { name: 'example', type: 'uint256' } ], outputs: [ { name: 'amounts', type: 'uint256' }] } ],
+            calls: [{ reference: 'fooCall', methodName: 'foo', methodParameters: [42] }]
+          },
+          callsReturnContext: [{
+              returnValues: [{ amounts: BigNumber }],
+              decoded: true,
+              reference: 'fooCall',
+              methodName: 'foo',
+              methodParameters: [42],
+              success: true
+          }]
+      },
+  },
+  blockNumber: 14571050
+}
+```
+
 ### passing extra context to the call
 
 If you want store any context or state so you don't need to look back over arrays once you got the result back. it can be stored in `context` within `ContractCallContext`.
@@ -318,7 +470,7 @@ console.log(results);
 
 ### try aggregate
 
-By default if you dont turn `tryAggregate` to true if 1 `eth_call` fails in your multicall the whole result will throw. If you turn `tryAggregate` to true it means if 1 of your `eth_call` methods fail it still return you the rest of the results. It will still be in the same order as you expect but you have a `success` boolean to check if it passed or failed.
+By default if you dont turn `tryAggregate` to true if 1 `eth_call` fails in your multicall the whole result will throw. If you turn `tryAggregate` to true it means if 1 of your `eth_call` methods fail it still return you the rest of the results. It will still be in the same order as you expect but you have a `success` boolean to check if it passed or failed. Keep in mind that if using a custom multicall contract deployment, Multicall version 1's will not work. Use a Multicall2 deployment (contract can be found [here](https://github.com/makerdao/multicall/blob/master/src/Multicall2.sol)).
 
 ```ts
 import {
@@ -466,25 +618,9 @@ console.log(results);
 
 ### Multicall contracts
 
-by default it looks at your network from the provider you passed in and makes the contract address to that:
+by default it looks at your network from the provider you passed in and makes the contract address to the known multicall contract addresses `0xcA11bde05977b3631167028862bE2a173976CA11` this is deployed on every single network but `etherlite` which uses `0x21681750D7ddCB8d1240eD47338dC984f94AF2aC`.
 
-| Network             | Address                                      |
-| ------------------- | -------------------------------------------- |
-| mainnet             | `0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696` |
-| kovan               | `0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696` |
-| görli               | `0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696` |
-| rinkeby             | `0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696` |
-| ropsten             | `0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696` |
-| binance smart chain | `0xC50F4c1E81c873B2204D7eFf7069Ffec6Fbe136D` |
-| bsc testnet         | `0x6e5BB1a5Ad6F68A8D7D6A5e47750eC15773d6042` |
-| xdai                | `0x2325b72990D81892E0e09cdE5C80DD221F147F8B` |
-| mumbai              | `0xe9939e7Ea7D7fb619Ac57f648Da7B1D425832631` |
-| etherlite           | `0x21681750D7ddCB8d1240eD47338dC984f94AF2aC` |
-| matic               | `0x275617327c958bD06b5D6b871E7f491D76113dd8` |
-| arbitrum            | `0x7a7443f8c577d537f1d8cd4a629d40a3148dd7ee` |
-| avalaunche fuji     | `0x3D015943d2780fE97FE3f69C97edA2CCC094f78c` |
-| avalaunche mainnet  | `0xed386Fe855C1EFf2f843B910923Dd8846E45C5A4` |
-| fantom mainnet      | `0xD98e3dBE5950Ca8Ce5a4b59630a5652110403E5c` |
+````ts
 
 If you wanted this to point at a different multicall contract address just pass that in the options when creating the multicall instance, example:
 
@@ -493,7 +629,7 @@ const multicall = new Multicall({
   multicallCustomContractAddress: '0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696',
   // your rest of your config depending on the provider your using.
 });
-```
+````
 
 ## Issues
 

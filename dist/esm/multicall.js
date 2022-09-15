@@ -1,3 +1,14 @@
+var __assign = (this && this.__assign) || function () {
+    __assign = Object.assign || function(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+                t[p] = s[p];
+        }
+        return t;
+    };
+    return __assign.apply(this, arguments);
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -142,7 +153,8 @@ var Multicall = /** @class */ (function () {
      * Call all the contract calls in 1
      * @param calls The calls
      */
-    Multicall.prototype.call = function (contractCallContexts) {
+    Multicall.prototype.call = function (contractCallContexts, contractCallOptions) {
+        if (contractCallOptions === void 0) { contractCallOptions = {}; }
         return __awaiter(this, void 0, void 0, function () {
             var aggregateResponse, returnObject, response, contractCallsResults, originalContractCallContext, returnObjectResult, method, methodContext, originalContractCallMethodContext, outputTypes, decodedReturnValues;
             return __generator(this, function (_a) {
@@ -151,7 +163,7 @@ var Multicall = /** @class */ (function () {
                         if (!Array.isArray(contractCallContexts)) {
                             contractCallContexts = [contractCallContexts];
                         }
-                        return [4 /*yield*/, this.execute(this.buildAggregateCallContext(contractCallContexts))];
+                        return [4 /*yield*/, this.execute(this.buildAggregateCallContext(contractCallContexts), contractCallOptions)];
                     case 1:
                         aggregateResponse = _a.sent();
                         returnObject = {
@@ -181,17 +193,32 @@ var Multicall = /** @class */ (function () {
                                     continue;
                                 }
                                 if (outputTypes && outputTypes.length > 0) {
-                                    decodedReturnValues = defaultAbiCoder.decode(
-                                    // tslint:disable-next-line: no-any
-                                    outputTypes, this.getReturnDataFromResult(methodContext.result));
-                                    returnObjectResult.callsReturnContext.push({
-                                        returnValues: this.formatReturnValues(decodedReturnValues),
-                                        decoded: true,
-                                        reference: originalContractCallMethodContext.reference,
-                                        methodName: originalContractCallMethodContext.methodName,
-                                        methodParameters: originalContractCallMethodContext.methodParameters,
-                                        success: true,
-                                    });
+                                    try {
+                                        decodedReturnValues = defaultAbiCoder.decode(
+                                        // tslint:disable-next-line: no-any
+                                        outputTypes, this.getReturnDataFromResult(methodContext.result));
+                                        returnObjectResult.callsReturnContext.push({
+                                            returnValues: this.formatReturnValues(decodedReturnValues),
+                                            decoded: true,
+                                            reference: originalContractCallMethodContext.reference,
+                                            methodName: originalContractCallMethodContext.methodName,
+                                            methodParameters: originalContractCallMethodContext.methodParameters,
+                                            success: true,
+                                        });
+                                    }
+                                    catch (e) {
+                                        if (!this._options.tryAggregate) {
+                                            throw e;
+                                        }
+                                        returnObjectResult.callsReturnContext.push({
+                                            returnValues: [],
+                                            decoded: false,
+                                            reference: originalContractCallMethodContext.reference,
+                                            methodName: originalContractCallMethodContext.methodName,
+                                            methodParameters: originalContractCallMethodContext.methodParameters,
+                                            success: false,
+                                        });
+                                    }
                                 }
                                 else {
                                     returnObjectResult.callsReturnContext.push({
@@ -265,8 +292,13 @@ var Multicall = /** @class */ (function () {
      */
     Multicall.prototype.findOutputTypesFromAbi = function (abi, methodName) {
         var _a;
+        var contract = new ethers.Contract(ethers.constants.AddressZero, abi);
+        methodName = methodName.trim();
+        if (contract.interface.functions[methodName]) {
+            return contract.interface.functions[methodName].outputs;
+        }
         for (var i = 0; i < abi.length; i++) {
-            if (((_a = abi[i].name) === null || _a === void 0 ? void 0 : _a.trim()) === methodName.trim()) {
+            if (((_a = abi[i].name) === null || _a === void 0 ? void 0 : _a.trim()) === methodName) {
                 return abi[i].outputs;
             }
         }
@@ -276,7 +308,7 @@ var Multicall = /** @class */ (function () {
      * Execute the multicall contract call
      * @param calls The calls
      */
-    Multicall.prototype.execute = function (calls) {
+    Multicall.prototype.execute = function (calls, options) {
         return __awaiter(this, void 0, void 0, function () {
             var _a;
             return __generator(this, function (_b) {
@@ -289,9 +321,9 @@ var Multicall = /** @class */ (function () {
                             case ExecutionType.customHttp: return [3 /*break*/, 3];
                         }
                         return [3 /*break*/, 5];
-                    case 1: return [4 /*yield*/, this.executeWithWeb3(calls)];
+                    case 1: return [4 /*yield*/, this.executeWithWeb3(calls, options)];
                     case 2: return [2 /*return*/, _b.sent()];
-                    case 3: return [4 /*yield*/, this.executeWithEthersOrCustom(calls)];
+                    case 3: return [4 /*yield*/, this.executeWithEthersOrCustom(calls, options)];
                     case 4: return [2 /*return*/, _b.sent()];
                     case 5: throw new Error("".concat(this._executionType, " is not defined"));
                 }
@@ -302,30 +334,35 @@ var Multicall = /** @class */ (function () {
      * Execute aggregate with web3 instance
      * @param calls The calls context
      */
-    Multicall.prototype.executeWithWeb3 = function (calls) {
+    Multicall.prototype.executeWithWeb3 = function (calls, options) {
         return __awaiter(this, void 0, void 0, function () {
-            var web3, networkId, contract, contractResponse, contractResponse;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
+            var web3, networkId, contract, callParams, contractResponse, contractResponse;
+            var _a, _b;
+            return __generator(this, function (_c) {
+                switch (_c.label) {
                     case 0:
                         web3 = this.getTypedOptions().web3Instance;
                         return [4 /*yield*/, web3.eth.net.getId()];
                     case 1:
-                        networkId = _a.sent();
+                        networkId = _c.sent();
                         contract = new web3.eth.Contract(this.ABI, this.getContractBasedOnNetwork(networkId));
+                        callParams = [];
+                        if (options.blockNumber) {
+                            callParams.push(options.blockNumber);
+                        }
                         if (!this._options.tryAggregate) return [3 /*break*/, 3];
-                        return [4 /*yield*/, contract.methods
-                                .tryBlockAndAggregate(false, this.mapCallContextToMatchContractFormat(calls))
-                                .call()];
+                        return [4 /*yield*/, (_a = contract.methods
+                                .tryBlockAndAggregate(false, this.mapCallContextToMatchContractFormat(calls)))
+                                .call.apply(_a, callParams)];
                     case 2:
-                        contractResponse = (_a.sent());
+                        contractResponse = (_c.sent());
                         contractResponse.blockNumber = BigNumber.from(contractResponse.blockNumber);
                         return [2 /*return*/, this.buildUpAggregateResponse(contractResponse, calls)];
-                    case 3: return [4 /*yield*/, contract.methods
-                            .aggregate(this.mapCallContextToMatchContractFormat(calls))
-                            .call()];
+                    case 3: return [4 /*yield*/, (_b = contract.methods
+                            .aggregate(this.mapCallContextToMatchContractFormat(calls)))
+                            .call.apply(_b, callParams)];
                     case 4:
-                        contractResponse = (_a.sent());
+                        contractResponse = (_c.sent());
                         contractResponse.blockNumber = BigNumber.from(contractResponse.blockNumber);
                         return [2 /*return*/, this.buildUpAggregateResponse(contractResponse, calls)];
                 }
@@ -336,9 +373,9 @@ var Multicall = /** @class */ (function () {
      * Execute with ethers using passed in provider context or custom one
      * @param calls The calls
      */
-    Multicall.prototype.executeWithEthersOrCustom = function (calls) {
+    Multicall.prototype.executeWithEthersOrCustom = function (calls, options) {
         return __awaiter(this, void 0, void 0, function () {
-            var ethersProvider, customProvider, network, contract, contractResponse, contractResponse;
+            var ethersProvider, customProvider, network, contract, overrideOptions, contractResponse, contractResponse;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -356,12 +393,16 @@ var Multicall = /** @class */ (function () {
                     case 1:
                         network = _a.sent();
                         contract = new ethers.Contract(this.getContractBasedOnNetwork(network.chainId), this.ABI, ethersProvider);
+                        overrideOptions = {};
+                        if (options.blockNumber) {
+                            overrideOptions = __assign(__assign({}, overrideOptions), { blockTag: Number(options.blockNumber) });
+                        }
                         if (!this._options.tryAggregate) return [3 /*break*/, 3];
-                        return [4 /*yield*/, contract.callStatic.tryBlockAndAggregate(false, this.mapCallContextToMatchContractFormat(calls))];
+                        return [4 /*yield*/, contract.callStatic.tryBlockAndAggregate(false, this.mapCallContextToMatchContractFormat(calls), overrideOptions)];
                     case 2:
                         contractResponse = (_a.sent());
                         return [2 /*return*/, this.buildUpAggregateResponse(contractResponse, calls)];
-                    case 3: return [4 /*yield*/, contract.callStatic.aggregate(this.mapCallContextToMatchContractFormat(calls))];
+                    case 3: return [4 /*yield*/, contract.callStatic.aggregate(this.mapCallContextToMatchContractFormat(calls), overrideOptions)];
                     case 4:
                         contractResponse = (_a.sent());
                         return [2 /*return*/, this.buildUpAggregateResponse(contractResponse, calls)];
@@ -435,33 +476,58 @@ var Multicall = /** @class */ (function () {
         }
         switch (network) {
             case Networks.mainnet:
-            case Networks.kovan:
-            case Networks.rinkeby:
             case Networks.ropsten:
+            case Networks.rinkeby:
             case Networks.goerli:
-                return '0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696';
-            case Networks.bsc:
-                return '0xC50F4c1E81c873B2204D7eFf7069Ffec6Fbe136D';
-            case Networks.bsc_testnet:
-                return '0x6e5BB1a5Ad6F68A8D7D6A5e47750eC15773d6042';
-            case Networks.xdai:
-                return '0x2325b72990D81892E0e09cdE5C80DD221F147F8B';
-            case Networks.mumbai:
-                return '0xe9939e7Ea7D7fb619Ac57f648Da7B1D425832631';
+            case Networks.optimism:
+            case Networks.kovan:
             case Networks.matic:
-                return '0x275617327c958bD06b5D6b871E7f491D76113dd8';
+            case Networks.kovanOptimism:
+            case Networks.xdai:
+            case Networks.goerliOptimism:
+            case Networks.arbitrum:
+            case Networks.rinkebyArbitrum:
+            case Networks.goerliArbitrum:
+            case Networks.mumbai:
+            case Networks.sepolia:
+            case Networks.avalancheMainnet:
+            case Networks.avalancheFuji:
+            case Networks.fantomTestnet:
+            case Networks.fantom:
+            case Networks.bsc:
+            case Networks.bsc_testnet:
+            case Networks.moonbeam:
+            case Networks.moonriver:
+            case Networks.moonbaseAlphaTestnet:
+            case Networks.harmony:
+            case Networks.cronos:
+            case Networks.fuse:
+            case Networks.songbirdCanaryNetwork:
+            case Networks.costonTestnet:
+            case Networks.boba:
+            case Networks.aurora:
+            case Networks.astar:
+            case Networks.okc:
+            case Networks.heco:
+            case Networks.metis:
+            case Networks.rsk:
+            case Networks.rskTestnet:
+            case Networks.evmos:
+            case Networks.evmosTestnet:
+            case Networks.thundercore:
+            case Networks.thundercoreTestnet:
+            case Networks.oasis:
+            case Networks.celo:
+            case Networks.godwoken:
+            case Networks.godwokentestnet:
+            case Networks.klatyn:
+            case Networks.milkomeda:
+            case Networks.kcc:
+                return '0xcA11bde05977b3631167028862bE2a173976CA11';
             case Networks.etherlite:
                 return '0x21681750D7ddCB8d1240eD47338dC984f94AF2aC';
-            case Networks.arbitrum:
-                return '0x80C7DD17B01855a6D2347444a0FCC36136a314de';
-            case Networks.avalauncheFuji:
-                return '0x3D015943d2780fE97FE3f69C97edA2CCC094f78c';
-            case Networks.avalauncheMainnet:
-                return '0xed386Fe855C1EFf2f843B910923Dd8846E45C5A4';
-            case Networks.fantom:
-                return '0xD98e3dBE5950Ca8Ce5a4b59630a5652110403E5c';
             default:
-                throw new Error("Network - ".concat(network, " is not got a contract defined it only supports mainnet, kovan, rinkeby, bsc and ropsten"));
+                throw new Error("Network - ".concat(network, " doesn't have a multicall contract address defined. Please check your network or deploy your own contract on it."));
         }
     };
     return Multicall;
