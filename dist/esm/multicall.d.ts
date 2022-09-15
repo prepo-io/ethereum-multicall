@@ -1,4 +1,4 @@
-import { ContractCallContext, ContractCallResults, MulticallOptionsCustomJsonRpcProvider, MulticallOptionsEthers, MulticallOptionsWeb3 } from './models';
+import { ContractCallContext, ContractCallResults, MulticallOptionsCustomJsonRpcProvider, MulticallOptionsEthers, MulticallOptionsWeb3, ContractCallOptions } from './models';
 export declare class Multicall {
     private _options;
     private readonly ABI;
@@ -8,7 +8,7 @@ export declare class Multicall {
      * Call all the contract calls in 1
      * @param calls The calls
      */
-    call(contractCallContexts: ContractCallContext[] | ContractCallContext): Promise<ContractCallResults>;
+    call(contractCallContexts: ContractCallContext[] | ContractCallContext, contractCallOptions?: ContractCallOptions): Promise<ContractCallResults>;
     /**
      * Get return data from result
      * @param result The result
